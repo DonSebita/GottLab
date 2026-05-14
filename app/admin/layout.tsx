@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { LayoutDashboard, Package, ShoppingCart, Users, Tag, Settings, LogOut, Leaf, ChevronRight, Menu, X, Moon, Sun, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from '@/components/ThemeProvider'
 
 const navItems = [
@@ -25,13 +24,42 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
 
-  const displayNombre = profile?.nombre ?? user?.email ?? 'Usuario'
-  const displayCargo = (profile && 'cargo' in profile ? profile.cargo : null) ?? profile?.role ?? 'empleado'
+  const displayNombre = profile?.nombre ?? user?.email ?? 'Admin'
+  const displayCargo = (profile && 'cargo' in profile ? profile.cargo : null) ?? profile?.role ?? 'admin'
 
-  useEffect(() => { if (!loading && (!user || !isAdmin)) router.replace('/login?redirect=/admin') }, [loading, user, isAdmin, router])
+  // Proxy.ts already validates auth + role server-side.
+  // Only redirect if auth state resolves to non-admin (edge case: session expired between proxy and render).
+  useEffect(() => { if (!loading && !user) router.replace('/login?redirect=/admin') }, [loading, user, router])
+  useEffect(() => { if (!loading && user && !isAdmin) router.replace('/') }, [loading, user, isAdmin, router])
 
-  if (loading) return <div className="min-h-screen bg-stone-100 dark:bg-stone-950 flex items-center justify-center"><div className="flex flex-col items-center gap-3"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /><p className="text-stone-400 text-sm">Verificando acceso...</p></div></div>
-  if (!user || !isAdmin) return null
+  // Show sidebar skeleton immediately — no spinner. Proxy.ts already verified the session.
+  // If auth context hasn't resolved yet, show skeleton quickly which will update in-place.
+  if (loading) {
+    return (
+      <div className="h-screen bg-stone-100 dark:bg-stone-950 flex overflow-hidden">
+        <aside className="w-64 bg-white dark:bg-stone-900 border-r border-stone-200 dark:border-stone-800 flex flex-col flex-shrink-0">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-stone-200 dark:border-stone-800">
+            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center"><Leaf className="h-4 w-4 text-white" /></div>
+            <span className="font-bold text-stone-900 dark:text-white">GottLab</span>
+            <span className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase tracking-wider">Admin</span>
+          </div>
+          <nav className="flex-1 px-3 py-4 space-y-0.5">
+            {navItems.map((item) => {
+              if (item.adminOnly && !isAdmin) return null
+              return (
+                <div key={item.href} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-stone-300 dark:text-stone-600">
+                  <item.icon className="h-4 w-4 flex-shrink-0" />{item.label}
+                </div>
+              )
+            })}
+          </nav>
+        </aside>
+        <div className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
+      </div>
+    )
+  }
 
   const isActive = (item: typeof navItems[0]) => item.exact ? pathname === item.href : pathname.startsWith(item.href)
 

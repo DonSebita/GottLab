@@ -65,7 +65,8 @@ export default function CarritoDropdown({ isMobile = false }: Props) {
   }
 
   const subtotal = items.reduce((sum, item) => {
-    return sum + (item.productos?.precio_venta || 0) * item.cantidad
+    const precio = item.precio_especial ?? item.productos?.precio_venta ?? 0
+    return sum + precio * item.cantidad
   }, 0)
 
   const formatCLP = (n: number) => `$${Number(n).toLocaleString('es-CL')}`
@@ -152,8 +153,13 @@ export default function CarritoDropdown({ isMobile = false }: Props) {
                         </p>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-sm font-bold text-black dark:text-white">
-                            {formatCLP(producto.precio_venta)}
+                            {formatCLP(item.precio_especial ?? producto.precio_venta)}
                           </span>
+                          {item.precio_especial && item.precio_especial < producto.precio_venta && (
+                            <span className="text-xs text-gray-400 line-through">
+                              {formatCLP(producto.precio_venta)}
+                            </span>
+                          )}
                           <span className="text-xs text-gray-500 dark:text-stone-400">
                             x{item.cantidad}
                           </span>

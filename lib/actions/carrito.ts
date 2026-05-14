@@ -39,6 +39,22 @@ export async function getCarrito() {
   return data || [];
 }
 
+// Single call that returns items + count — avoids duplicate auth + cleanup queries
+export async function getCarritoCompleto() {
+  const supabase = await createClient();
+  const idCliente = await getClienteIdOrThrow();
+  await limpiarReservasExpiradas(supabase);
+  const { data, error } = await supabase
+    .from("reservas")
+    .select(`id_reserva, id_producto, cantidad, fecha_expiracion, precio_especial, origen, productos (nombre, nombre_cientifico, precio_venta, stock_total, imagenes_productos (url))`)
+    .eq("id_cliente", idCliente)
+    .gt("fecha_expiracion", new Date().toISOString());
+  if (error) { console.error("Error obteniendo carrito:", error); return { items: [], contador: 0 }; }
+  const items = data || [];
+  const contador = items.reduce((sum: number, r: any) => sum + (r.cantidad || 0), 0);
+  return { items, contador };
+}
+
 export async function agregarAlCarrito(idProducto: number, cantidad = 1) {
   const supabase = await createClient();
   const idCliente = await getClienteIdOrThrow();
@@ -268,4 +284,87 @@ export async function getTiempoRestante(idReserva: number) {
   const ahora = Date.now();
   const exp = new Date(data.fecha_expiracion).getTime();
   return Math.max(0, Math.floor((exp - ahora) / 1000)); // seconds remaining
+}
+
+// ─── Admin: obtener carrito de un cliente especifico ────────────────────────
+export async function adminGetCarrito(idCliente: number) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autorizado");
+
+  const adminCheck = user.user_metadata?.role || user.app_metadata?.role;
+  if (adminCheck !== 'admin') throw new Error("Solo administradores");
+
+  // Limpiar expiradas primero
+  await limpiarReservasExpiradas(supabase);
+
+  const { data, error } = await supabase
+    .from("reservas")
+    .select(`id_reserva, id_producto, cantidad, fecha_expiracion, precio_especial, origen, productos (nombre, nombre_cientifico, precio_venta, stock_total, imagenes_productos (url))`)
+    .eq("id_cliente", idCliente)
+    .gt("fecha_expiracion", new Date().toISOString())
+    .order("fecha_expiracion", { ascending: true });
+
+  if (error) { console.error("Error obteniendo carrito del cliente:", error); return []; }
+  return data || [];
+}
+
+// ─── Admin: editar una reserva existente ────────────────────────────────────
+export async function adminEditarReserva(
+  idReserva: number,
+  updates: { cantidad?: number; precio_especial?: number | null; expiracion_minutos?: number }
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "No autorizado" };
+
+  const adminCheck = user.user_metadata?.role || user.app_metadata?.role;
+  if (adminCheck !== 'admin') return { success: false, error: "Solo administradores" };
+
+  const updateData: Record<string, any> = {};
+
+  if (updates.cantidad !== undefined) {
+    if (updates.cantidad < 1) return { success: false, error: "La cantidad debe ser al menos 1" };
+    updateData.cantidad = updates.cantidad;
+  }
+
+  if (updates.precio_especial !== undefined) {
+    updateData.precio_especial = updates.precio_especial;
+  }
+
+  if (updates.expiracion_minutos !== undefined) {
+    const { data: reserva } = await supabase.from("reservas").select("fecha_expiracion").eq("id_reserva", idReserva).maybeSingle();
+    if (!reserva) return { success: false, error: "Reserva no encontrada" };
+    // Extender desde la fecha de expiracion actual (no desde ahora)
+    const expActual = new Date(reserva.fecha_expiracion).getTime();
+    updateData.fecha_expiracion = new Date(expActual + updates.expiracion_minutos * 60000).toISOString();
+  }
+
+  if (Object.keys(updateData).length === 0) return { success: false, error: "Sin cambios" };
+
+  const { error } = await supabase
+    .from("reservas")
+    .update(updateData)
+    .eq("id_reserva", idReserva);
+
+  if (error) return { success: false, error: "Error al editar reserva" };
+  return { success: true, message: "Reserva actualizada" };
+}
+
+// ─── Admin: eliminar una reserva ────────────────────────────────────────────
+export async function adminEliminarReserva(idReserva: number) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "No autorizado" };
+
+  const adminCheck = user.user_metadata?.role || user.app_metadata?.role;
+  if (adminCheck !== 'admin') return { success: false, error: "Solo administradores" };
+
+  const { error } = await supabase
+    .from("reservas")
+    .delete()
+    .eq("id_reserva", idReserva);
+
+  if (error) return { success: false, error: "Error al eliminar reserva" };
+  return { success: true, message: "Reserva eliminada" };
 }
