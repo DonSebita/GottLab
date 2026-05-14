@@ -32,7 +32,7 @@ export async function getCarrito() {
   await limpiarReservasExpiradas(supabase);
   const { data, error } = await supabase
     .from("reservas")
-    .select(`id_reserva, id_producto, cantidad, fecha_expiracion, productos (nombre, nombre_cientifico, precio_venta, stock_total, imagenes_productos (url))`)
+    .select(`id_reserva, id_producto, cantidad, fecha_expiracion, precio_especial, origen, productos (nombre, nombre_cientifico, precio_venta, stock_total, imagenes_productos (url))`)
     .eq("id_cliente", idCliente)
     .gt("fecha_expiracion", new Date().toISOString());
   if (error) { console.error("Error obteniendo carrito:", error); return []; }
@@ -155,4 +155,117 @@ export async function validarCarritoParaCheckout() {
   }
   const total = itemsValidados.reduce((sum: number, item: any) => sum + item.subtotal, 0);
   return { valido: errores.length === 0, errores, items: itemsValidados, total, cantidadItems: itemsValidados.reduce((sum: number, item: any) => sum + item.cantidad, 0) };
+}
+
+// ─── Admin: buscar clientes ──────────────────────────────────────────────────
+export async function getClientes(busqueda: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autorizado");
+
+  // Verify admin role
+  const adminCheck = user.user_metadata?.role || user.app_metadata?.role;
+  if (adminCheck !== 'admin') throw new Error("Solo administradores");
+
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("id_cliente, nombre, apellido, email, telefono")
+    .or(`nombre.ilike.%${busqueda}%,email.ilike.%${busqueda}%`)
+    .limit(20);
+
+  if (error) { console.error("Error buscando clientes:", error); return []; }
+  // Also get emails from auth.users via clientes relationship
+  return data || [];
+}
+
+// ─── Admin: agregar al carrito de cualquier cliente ────────────────────────
+export async function adminAgregarAlCarrito(
+  idCliente: number,
+  idProducto: number,
+  cantidad: number,
+  precioEspecial: number | null,
+  origen: 'web' | 'live' = 'live',
+  expiracionMinutos: number = 60
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "No autorizado" };
+
+  const adminCheck = user.user_metadata?.role || user.app_metadata?.role;
+  if (adminCheck !== 'admin') return { success: false, error: "Solo administradores" };
+
+  // Verify cliente exists
+  const { data: cliente } = await supabase.from("clientes").select("id_cliente").eq("id_cliente", idCliente).maybeSingle();
+  if (!cliente) return { success: false, error: "Cliente no encontrado" };
+
+  // Verify producto exists and is active
+  const { data: producto } = await supabase.from("productos").select("stock_total, estado").eq("id_producto", idProducto).maybeSingle();
+  if (!producto) return { success: false, error: "Producto no encontrado" };
+  if (producto.estado !== 'activo') return { success: false, error: "Producto no disponible" };
+
+  // Check stock (reserved + existing)
+  const { data: reservasActivas } = await supabase.from("reservas").select("cantidad").eq("id_producto", idProducto).gt("fecha_expiracion", new Date().toISOString());
+  const stockReservado = reservasActivas?.reduce((sum: number, r: any) => sum + r.cantidad, 0) || 0;
+  const stockDisponible = producto.stock_total - stockReservado;
+
+  if (cantidad > stockDisponible) {
+    return { success: false, error: `Solo hay ${stockDisponible} unidades disponibles` };
+  }
+
+  const fechaExpiracion = new Date(Date.now() + expiracionMinutos * 60000);
+
+  // Check if client already has this product reserved
+  const { data: existente } = await supabase
+    .from("reservas")
+    .select("id_reserva, cantidad")
+    .eq("id_cliente", idCliente)
+    .eq("id_producto", idProducto)
+    .gt("fecha_expiracion", new Date().toISOString())
+    .maybeSingle();
+
+  if (existente) {
+    const nuevaCantidad = existente.cantidad + cantidad;
+    const { error } = await supabase
+      .from("reservas")
+      .update({ cantidad: nuevaCantidad, fecha_expiracion: fechaExpiracion.toISOString(), precio_especial: precioEspecial, origen })
+      .eq("id_reserva", existente.id_reserva);
+    if (error) return { success: false, error: "Error al actualizar reserva" };
+    return { success: true, message: "Cantidad actualizada en carrito del cliente" };
+  }
+
+  const { error } = await supabase
+    .from("reservas")
+    .insert({ id_cliente: idCliente, id_producto: idProducto, cantidad, fecha_expiracion: fechaExpiracion.toISOString(), precio_especial: precioEspecial, origen });
+
+  if (error) return { success: false, error: "Error al agregar al carrito" };
+  return { success: true, message: "Producto agregado al carrito del cliente" };
+}
+
+// ─── Admin: extender expiración de una reserva ──────────────────────────────
+export async function extenderExpiracion(idReserva: number, minutosExtra: number = 30) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "No autorizado" };
+
+  const { data: reserva } = await supabase.from("reservas").select("fecha_expiracion").eq("id_reserva", idReserva).maybeSingle();
+  if (!reserva) return { success: false, error: "Reserva no encontrada" };
+
+  const nuevaExpiracion = new Date(new Date(reserva.fecha_expiracion).getTime() + minutosExtra * 60000);
+  const { error } = await supabase
+    .from("reservas")
+    .update({ fecha_expiracion: nuevaExpiracion.toISOString() })
+    .eq("id_reserva", idReserva);
+
+  if (error) return { success: false, error: "Error al extender expiracion" };
+  return { success: true, message: `Expiracion extendida ${minutosExtra} minutos` };
+}
+
+// ─── Obtener tiempo restante de una reserva ──────────────────────────────────
+export async function getTiempoRestante(idReserva: number) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("reservas").select("fecha_expiracion").eq("id_reserva", idReserva).maybeSingle();
+  if (!data) return null;
+  const ahora = Date.now();
+  const exp = new Date(data.fecha_expiracion).getTime();
+  return Math.max(0, Math.floor((exp - ahora) / 1000)); // seconds remaining
 }

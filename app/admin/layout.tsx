@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
-import { LayoutDashboard, Package, ShoppingCart, Users, Tag, Settings, LogOut, Leaf, ChevronRight, Menu, X, Moon, Sun } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, Users, Tag, Settings, LogOut, Leaf, ChevronRight, Menu, X, Moon, Sun, Zap } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from '@/components/ThemeProvider'
 
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/productos', label: 'Productos', icon: Package },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingCart },
+  { href: '/admin/live', label: 'Ventas Live', icon: Zap },
   { href: '/admin/usuarios', label: 'Empleados', icon: Users, adminOnly: true },
   { href: '/admin/categorias', label: 'Categorias', icon: Tag },
   { href: '/admin/configuracion', label: 'Configuracion', icon: Settings, adminOnly: true },

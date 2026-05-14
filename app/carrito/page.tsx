@@ -1,19 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCarrito } from '@/contexts/CarritoContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { validarCarritoParaCheckout } from '@/lib/actions/carrito'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Minus, Plus, Trash2, ArrowLeft, AlertCircle, Phone, IdCard, User, LogIn } from 'lucide-react'
+import { Minus, Plus, Trash2, ArrowLeft, AlertCircle, Phone, IdCard, User, LogIn, Clock, Zap } from 'lucide-react'
+import { formatCLP } from '@/lib/utils'
+
+function CountdownTimer({ fechaExpiracion }: { fechaExpiracion: string }) {
+  const [segundos, setSegundos] = useState(0)
+
+  useEffect(() => {
+    const tick = () => {
+      const remaining = Math.max(0, Math.floor((new Date(fechaExpiracion).getTime() - Date.now()) / 1000))
+      setSegundos(remaining)
+    }
+    tick()
+    const i = setInterval(tick, 1000)
+    return () => clearInterval(i)
+  }, [fechaExpiracion])
+
+  const min = Math.floor(segundos / 60)
+  const sec = segundos % 60
+  const urgent = segundos < 300 // < 5 min
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-mono ${urgent ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+      <Clock className="h-3 w-3" />
+      {min}:{sec.toString().padStart(2, '0')}
+    </span>
+  )
+}
 
 export default function CarritoPage() {
   const { items, loading, actualizarCantidad, eliminarProducto, vaciar, puedeUsarCarrito } = useCarrito()
   const { isCliente, profile } = useAuth()
   const [validando, setValidando] = useState(false)
   const [erroresValidacion, setErroresValidacion] = useState<string[]>([])
-  const [checkoutOk, setCheckoutOk] = useState(false)
 
   const tieneTelefono = !!profile?.telefono?.trim()
   const tieneRut = !!profile?.rut?.trim()
@@ -23,7 +48,6 @@ export default function CarritoPage() {
     if (!isCliente) return
     setValidando(true)
     setErroresValidacion([])
-    setCheckoutOk(false)
 
     if (!datosCompletos) {
       const errs = []
@@ -38,7 +62,6 @@ export default function CarritoPage() {
     if (!resultado.valido) { setErroresValidacion(resultado.errores); setValidando(false); return }
 
     // TODO: Redirect to checkout page
-    setCheckoutOk(true)
     setValidando(false)
   }
 
@@ -46,7 +69,6 @@ export default function CarritoPage() {
     return <div className="min-h-screen bg-white dark:bg-stone-950 flex items-center justify-center"><p className="text-gray-500 dark:text-stone-400">Cargando carrito...</p></div>
   }
 
-  // Not logged in or not a client
   if (!isCliente) {
     return (
       <div className="min-h-screen bg-white dark:bg-stone-950 pt-20">
@@ -79,8 +101,10 @@ export default function CarritoPage() {
     )
   }
 
-  const subtotal = items.reduce((sum, item) => sum + (item.productos?.precio_venta || 0) * item.cantidad, 0)
-  const formatCLP = (n: number) => `$${Number(n).toLocaleString('es-CL')}`
+  const subtotal = items.reduce((sum, item) => {
+    const precio = item.precio_especial ?? item.productos?.precio_venta ?? 0
+    return sum + precio * item.cantidad
+  }, 0)
 
   return (
     <div className="min-h-screen bg-white dark:bg-stone-950 pt-20">
@@ -98,18 +122,42 @@ export default function CarritoPage() {
               const producto = item.productos
               if (!producto) return null
               const img = producto.imagenes_productos?.[0]?.url || '/placeholder.avif'
-              const tiempoRestante = new Date(item.fecha_expiracion).getTime() - Date.now()
-              const minutos = Math.floor(tiempoRestante / 60000)
+              const precio = item.precio_especial ?? producto.precio_venta
+              const tieneDescuento = item.precio_especial && item.precio_especial < producto.precio_venta
+              const esLive = item.origen === 'live'
+
               return (
                 <div key={item.id_reserva} className="bg-stone-50 dark:bg-stone-900 rounded-2xl p-4 flex gap-4">
                   <div className="relative w-24 h-24 flex-shrink-0 bg-white dark:bg-stone-800 rounded-xl overflow-hidden">
                     <Image src={img} alt={producto.nombre} fill className="object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <Link href={`/productos/${item.id_producto}`}><h3 className="font-bold text-black dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors line-clamp-1">{producto.nombre}</h3></Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/productos/${item.id_producto}`}>
+                        <h3 className="font-bold text-black dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors line-clamp-1">
+                          {producto.nombre}
+                        </h3>
+                      </Link>
+                      {esLive && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                          <Zap className="h-2.5 w-2.5" /> LIVE
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 dark:text-stone-400 italic line-clamp-1">{producto.nombre_cientifico}</p>
-                    <p className="text-lg font-black text-black dark:text-white mt-1">{formatCLP(producto.precio_venta)}</p>
-                    {minutos > 0 && minutos < 5 && <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Reserva expira en {minutos} min</p>}
+                    <div className="mt-1">
+                      {tieneDescuento ? (
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-lg font-black text-black dark:text-white">{formatCLP(precio)}</span>
+                          <span className="text-sm text-gray-400 line-through">{formatCLP(producto.precio_venta)}</span>
+                        </div>
+                      ) : (
+                        <p className="text-lg font-black text-black dark:text-white">{formatCLP(precio)}</p>
+                      )}
+                    </div>
+                    <div className="mt-1">
+                      <CountdownTimer fechaExpiracion={item.fecha_expiracion} />
+                    </div>
                   </div>
                   <div className="flex flex-col items-end justify-between">
                     <button onClick={() => eliminarProducto(item.id_reserva)} className="text-red-600 hover:text-red-700 p-1"><Trash2 className="h-5 w-5" /></button>
@@ -127,7 +175,6 @@ export default function CarritoPage() {
             <div className="bg-stone-50 dark:bg-stone-900 rounded-2xl p-6 sticky top-24">
               <h2 className="text-xl font-bold text-black dark:text-white mb-4">Resumen</h2>
 
-              {/* Seba: missing data alert */}
               {!datosCompletos && (
                 <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                   <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-2"><User className="h-4 w-4" />Datos requeridos para comprar</p>
@@ -146,13 +193,6 @@ export default function CarritoPage() {
                       <ul className="text-xs text-red-700 dark:text-red-400 space-y-1">{erroresValidacion.map((e, i) => <li key={i}>• {e}</li>)}</ul>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {checkoutOk && (
-                <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
-                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">✓ Carrito validado correctamente</p>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">Redirigiendo al pago...</p>
                 </div>
               )}
 
