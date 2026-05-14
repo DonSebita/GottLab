@@ -15,8 +15,9 @@ export default async function ProductoDetallePage({ params }: { params: Promise<
     notFound()
   }
 
-  const enStock = producto.stock_total > 0
-  const stockBajo = producto.stock_total > 0 && producto.stock_total <= 5
+  const stock = producto.stock_total ?? 0
+  const enStock = stock > 0
+  const stockBajo = stock > 0 && stock <= 5
   const cats = producto.categorias as any
   const categoria = Array.isArray(cats) ? (cats[0]?.nombre || '') : (cats?.nombre || '')
   const imagenPrincipal = producto.imagenes_productos?.find((img: any) => img.es_principal)?.url

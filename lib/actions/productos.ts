@@ -1,6 +1,10 @@
 "use server";
 
-import { supabase } from "../supabaseServer";
+import { createClient } from "@/lib/supabase/server";
+
+async function getSupabase() {
+  return await createClient();
+}
 
 const PRODUCTO_SELECT = `
   id_producto, nombre, nombre_cientifico, descripcion, precio_venta,
@@ -44,15 +48,15 @@ interface GetProductosParams {
 export async function getProductos({ pagina = 1, porPagina = 12, categoria = "", busqueda = "", precio = "", disponibilidad = "" }: GetProductosParams = {}) {
   const desde = (pagina - 1) * porPagina;
   const hasta = desde + porPagina - 1;
-  let query = supabase.from("productos").select(PRODUCTO_SELECT, { count: "exact" }).eq("estado", "activo");
+  let query = (await getSupabase()).from("productos").select(PRODUCTO_SELECT, { count: "exact" }).eq("estado", "activo");
 
   if (categoria && categoria !== "todas") {
     const nombres = categoria.split(',').map(c => c.trim()).filter(Boolean);
     if (nombres.length === 1) {
-      const { data: cat } = await supabase.from("categorias").select("id_categoria").eq("nombre", nombres[0]).single();
+      const { data: cat } = await (await getSupabase()).from("categorias").select("id_categoria").eq("nombre", nombres[0]).single();
       if (cat) query = query.eq("id_categoria", cat.id_categoria);
     } else if (nombres.length > 1) {
-      const { data: cats } = await supabase.from("categorias").select("id_categoria").in("nombre", nombres);
+      const { data: cats } = await (await getSupabase()).from("categorias").select("id_categoria").in("nombre", nombres);
       if (cats && cats.length > 0) query = query.in("id_categoria", cats.map(c => c.id_categoria));
     }
   }
@@ -71,19 +75,19 @@ export async function getProductos({ pagina = 1, porPagina = 12, categoria = "",
 }
 
 export async function getCategorias() {
-  const { data, error } = await supabase.from("categorias").select("nombre");
+  const { data, error } = await (await getSupabase()).from("categorias").select("nombre");
   if (error) { console.error(error); return []; }
   const nombres = data.map((c: any) => c.nombre?.trim()).filter(Boolean);
   return [...new Set(nombres)].sort();
 }
 
 export async function getDestacados(limit = 4) {
-  const { data, error } = await supabase.from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").eq("destacado", true).order("prioridad", { ascending: false }).limit(limit);
+  const { data, error } = await (await getSupabase()).from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").eq("destacado", true).order("prioridad", { ascending: false }).limit(limit);
   if (error) return [];
   let resultado = uniqueById(data);
   if (resultado.length < limit) {
     const ids = resultado.map((p: any) => p.id_producto);
-    let extrasQuery = supabase.from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").order("destacado", { ascending: false }).order("prioridad", { ascending: false }).limit(limit - resultado.length);
+    let extrasQuery = (await getSupabase()).from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").order("destacado", { ascending: false }).order("prioridad", { ascending: false }).limit(limit - resultado.length);
     if (ids.length > 0) extrasQuery = extrasQuery.not("id_producto", "in", `(${ids.join(",")})`);
     const { data: extras } = await extrasQuery;
     if (extras) resultado = uniqueById([...resultado, ...extras]);
@@ -92,12 +96,12 @@ export async function getDestacados(limit = 4) {
 }
 
 export async function getNuevos(limit = 6) {
-  const { data, error } = await supabase.from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").eq("nuevo", true).order("prioridad", { ascending: false }).limit(limit);
+  const { data, error } = await (await getSupabase()).from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").eq("nuevo", true).order("prioridad", { ascending: false }).limit(limit);
   if (error) return [];
   let resultado = uniqueById(data);
   if (resultado.length < limit) {
     const ids = resultado.map((p: any) => p.id_producto);
-    let extrasQuery = supabase.from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").eq("nuevo", false).order("destacado", { ascending: false }).order("prioridad", { ascending: false }).limit(limit - resultado.length);
+    let extrasQuery = (await getSupabase()).from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").eq("nuevo", false).order("destacado", { ascending: false }).order("prioridad", { ascending: false }).limit(limit - resultado.length);
     if (ids.length > 0) extrasQuery = extrasQuery.not("id_producto", "in", `(${ids.join(",")})`);
     const { data: extras } = await extrasQuery;
     if (extras) resultado = uniqueById([...resultado, ...extras]);
@@ -106,12 +110,12 @@ export async function getNuevos(limit = 6) {
 }
 
 export async function getHeroProductos(limit = 4) {
-  const { data, error } = await supabase.from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").or("destacado.eq.true,nuevo.eq.true,prioridad.gte.10").order("destacado", { ascending: false }).order("nuevo", { ascending: false }).order("prioridad", { ascending: false }).limit(limit * 2);
+  const { data, error } = await (await getSupabase()).from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").or("destacado.eq.true,nuevo.eq.true,prioridad.gte.10").order("destacado", { ascending: false }).order("nuevo", { ascending: false }).order("prioridad", { ascending: false }).limit(limit * 2);
   if (error) return [];
   let resultado = uniqueById(data).slice(0, limit);
   if (resultado.length < limit) {
     const ids = resultado.map((p: any) => p.id_producto);
-    let extrasQuery = supabase.from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").order("prioridad", { ascending: false }).limit(limit - resultado.length);
+    let extrasQuery = (await getSupabase()).from("productos").select(PRODUCTO_SELECT).eq("estado", "activo").order("prioridad", { ascending: false }).limit(limit - resultado.length);
     if (ids.length > 0) extrasQuery = extrasQuery.not("id_producto", "in", `(${ids.join(",")})`);
     const { data: extras } = await extrasQuery;
     if (extras) resultado = uniqueById([...resultado, ...extras]).slice(0, limit);
@@ -120,7 +124,7 @@ export async function getHeroProductos(limit = 4) {
 }
 
 export async function getProductoById(id: string) {
-  const { data, error } = await supabase.from("productos").select(`id_producto, nombre, nombre_cientifico, descripcion, precio_venta, precio_costo, stock_total, estado, tipo_venta, id_categoria, categorias (nombre), imagenes_productos (url, es_principal, orden)`).eq("id_producto", id).single();
+  const { data, error } = await (await getSupabase()).from("productos").select(`id_producto, nombre, nombre_cientifico, descripcion, precio_venta, precio_costo, stock_total, estado, tipo_venta, id_categoria, categorias (nombre), imagenes_productos (url, es_principal, orden)`).eq("id_producto", Number(id)).single();
   if (error) { console.error(error); return null; }
   return data;
 }

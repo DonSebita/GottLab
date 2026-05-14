@@ -67,7 +67,7 @@ export default async function ConsultaPage({ params }: { params: Promise<{ id: s
             <div>
               <span className="text-gray-400">Stock</span>
               <p className="font-semibold text-black">
-                {producto.stock_total > 0 ? `${producto.stock_total} disponibles` : 'Agotado'}
+                {(producto.stock_total ?? 0) > 0 ? `${producto.stock_total} disponibles` : 'Agotado'}
               </p>
             </div>
             <div>
