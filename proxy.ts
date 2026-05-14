@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const protectedPrefixes = ['/admin', '/panel-empleado', '/mi-cuenta']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request)
   const pathname = request.nextUrl.pathname
   const needsAuth = protectedPrefixes.some((p) => pathname.startsWith(p))
