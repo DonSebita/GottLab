@@ -9,24 +9,22 @@ import Link from 'next/link'
 import { Minus, Plus, Trash2, ArrowLeft, AlertCircle, Phone, IdCard, User, LogIn } from 'lucide-react'
 
 export default function CarritoPage() {
-  const { items, loading, actualizarCantidad, eliminarProducto, vaciar } = useCarrito()
-  const { isCliente, perfilId, profile } = useAuth()
+  const { items, loading, actualizarCantidad, eliminarProducto, vaciar, puedeUsarCarrito } = useCarrito()
+  const { isCliente, profile } = useAuth()
   const [validando, setValidando] = useState(false)
   const [erroresValidacion, setErroresValidacion] = useState<string[]>([])
+  const [checkoutOk, setCheckoutOk] = useState(false)
 
-  const idCliente = isCliente && perfilId ? perfilId : null
-
-  // Seba's feature: validate phone + RUT before checkout
   const tieneTelefono = !!profile?.telefono?.trim()
   const tieneRut = !!profile?.rut?.trim()
   const datosCompletos = tieneTelefono && tieneRut
 
   const handleProcederAlPago = async () => {
-    if (!idCliente) return
+    if (!isCliente) return
     setValidando(true)
     setErroresValidacion([])
+    setCheckoutOk(false)
 
-    // Seba: require phone + RUT
     if (!datosCompletos) {
       const errs = []
       if (!tieneTelefono) errs.push('Debes completar tu telefono en Mi Cuenta para proceder con la compra')
@@ -36,12 +34,11 @@ export default function CarritoPage() {
       return
     }
 
-    const resultado = await validarCarritoParaCheckout(idCliente)
+    const resultado = await validarCarritoParaCheckout()
     if (!resultado.valido) { setErroresValidacion(resultado.errores); setValidando(false); return }
 
     // TODO: Redirect to checkout page
-    console.log('Carrito validado:', resultado)
-    alert('Carrito validado correctamente. Redirigiendo al pago...')
+    setCheckoutOk(true)
     setValidando(false)
   }
 
@@ -49,7 +46,7 @@ export default function CarritoPage() {
     return <div className="min-h-screen bg-white dark:bg-stone-950 flex items-center justify-center"><p className="text-gray-500 dark:text-stone-400">Cargando carrito...</p></div>
   }
 
-  // Not logged in
+  // Not logged in or not a client
   if (!isCliente) {
     return (
       <div className="min-h-screen bg-white dark:bg-stone-950 pt-20">
@@ -149,6 +146,13 @@ export default function CarritoPage() {
                       <ul className="text-xs text-red-700 dark:text-red-400 space-y-1">{erroresValidacion.map((e, i) => <li key={i}>• {e}</li>)}</ul>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {checkoutOk && (
+                <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">✓ Carrito validado correctamente</p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">Redirigiendo al pago...</p>
                 </div>
               )}
 

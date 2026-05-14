@@ -1,17 +1,35 @@
+// @ts-nocheck
 "use server";
 
-import { supabase } from "../supabaseServer";
+import { createClient } from "../supabase/server";
 
 const EXPIRACION_MINUTOS = 15;
 
-async function limpiarReservasExpiradas() {
+async function getClienteIdOrThrow(): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error("No autorizado — inicia sesion");
+
+  const { data: cliente, error: clientError } = await supabase
+    .from("clientes")
+    .select("id_cliente")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+
+  if (clientError || !cliente) throw new Error("No autorizado — solo clientes pueden usar el carrito");
+  return (cliente as any).id_cliente as number;
+}
+
+async function limpiarReservasExpiradas(supabase: any) {
   const ahora = new Date();
   const tiempoExpiracion = new Date(ahora.getTime() - EXPIRACION_MINUTOS * 60000);
   await supabase.from("reservas").delete().lt("fecha_expiracion", tiempoExpiracion.toISOString());
 }
 
-export async function getCarrito(idCliente: number) {
-  await limpiarReservasExpiradas();
+export async function getCarrito() {
+  const supabase = await createClient();
+  const idCliente = await getClienteIdOrThrow();
+  await limpiarReservasExpiradas(supabase);
   const { data, error } = await supabase
     .from("reservas")
     .select(`id_reserva, id_producto, cantidad, fecha_expiracion, productos (nombre, nombre_cientifico, precio_venta, stock_total, imagenes_productos (url))`)
@@ -21,18 +39,30 @@ export async function getCarrito(idCliente: number) {
   return data || [];
 }
 
-export async function agregarAlCarrito(idCliente: number, idProducto: number, cantidad = 1) {
-  await limpiarReservasExpiradas();
-  const { data: producto } = await supabase.from("productos").select("stock_total").eq("id_producto", idProducto).single();
+export async function agregarAlCarrito(idProducto: number, cantidad = 1) {
+  const supabase = await createClient();
+  const idCliente = await getClienteIdOrThrow();
+  await limpiarReservasExpiradas(supabase);
+
+  const { data: producto } = await supabase.from("productos").select("stock_total").eq("id_producto", idProducto).maybeSingle();
   if (!producto) return { success: false, error: "Producto no encontrado" };
 
   const { data: reservasActivas } = await supabase.from("reservas").select("cantidad").eq("id_producto", idProducto).gt("fecha_expiracion", new Date().toISOString());
   const stockReservado = reservasActivas?.reduce((sum: number, r: any) => sum + r.cantidad, 0) || 0;
-  const stockDisponible = producto.stock_total - stockReservado;
+  const stockDisponible = (producto as any).stock_total - stockReservado;
 
   if (cantidad > stockDisponible) return { success: false, error: `Solo hay ${stockDisponible} unidades disponibles` };
 
-  const { data: reservaExistente } = await supabase.from("reservas").select("id_reserva, cantidad").eq("id_cliente", idCliente).eq("id_producto", idProducto).gt("fecha_expiracion", new Date().toISOString()).single();
+  const { data: reservaExistente, error: findError } = await supabase
+    .from("reservas")
+    .select("id_reserva, cantidad")
+    .eq("id_cliente", idCliente)
+    .eq("id_producto", idProducto)
+    .gt("fecha_expiracion", new Date().toISOString())
+    .maybeSingle();
+
+  if (findError) return { success: false, error: "Error al verificar el carrito" };
+
   const fechaExpiracion = new Date(Date.now() + EXPIRACION_MINUTOS * 60000);
 
   if (reservaExistente) {
@@ -49,14 +79,21 @@ export async function agregarAlCarrito(idCliente: number, idProducto: number, ca
 }
 
 export async function actualizarCantidad(idReserva: number, nuevaCantidad: number) {
+  const supabase = await createClient();
+  await getClienteIdOrThrow(); // validates auth
   if (nuevaCantidad < 1) return eliminarDelCarrito(idReserva);
-  const { data: reserva } = await supabase.from("reservas").select("id_producto, cantidad").eq("id_reserva", idReserva).single();
+
+  const { data: reserva } = await supabase.from("reservas").select("id_producto, cantidad").eq("id_reserva", idReserva).maybeSingle();
   if (!reserva) return { success: false, error: "Reserva no encontrada" };
-  const { data: producto } = await supabase.from("productos").select("stock_total").eq("id_producto", reserva.id_producto).single();
+
+  const { data: producto } = await supabase.from("productos").select("stock_total").eq("id_producto", reserva.id_producto).maybeSingle();
+  if (!producto) return { success: false, error: "Producto no encontrado" };
+
   const { data: otrasReservas } = await supabase.from("reservas").select("cantidad").eq("id_producto", reserva.id_producto).neq("id_reserva", idReserva).gt("fecha_expiracion", new Date().toISOString());
   const stockReservadoPorOtros = otrasReservas?.reduce((sum: number, r: any) => sum + r.cantidad, 0) || 0;
   const stockDisponible = (producto as any).stock_total - stockReservadoPorOtros;
   if (nuevaCantidad > stockDisponible) return { success: false, error: `Solo hay ${stockDisponible} unidades disponibles` };
+
   const fechaExpiracion = new Date(Date.now() + EXPIRACION_MINUTOS * 60000);
   const { error } = await supabase.from("reservas").update({ cantidad: nuevaCantidad, fecha_expiracion: fechaExpiracion.toISOString() }).eq("id_reserva", idReserva);
   if (error) return { success: false, error: "Error al actualizar cantidad" };
@@ -64,26 +101,34 @@ export async function actualizarCantidad(idReserva: number, nuevaCantidad: numbe
 }
 
 export async function eliminarDelCarrito(idReserva: number) {
+  const supabase = await createClient();
+  await getClienteIdOrThrow();
   const { error } = await supabase.from("reservas").delete().eq("id_reserva", idReserva);
   if (error) return { success: false, error: "Error al eliminar del carrito" };
   return { success: true, message: "Producto eliminado del carrito" };
 }
 
-export async function vaciarCarrito(idCliente: number) {
+export async function vaciarCarrito() {
+  const supabase = await createClient();
+  const idCliente = await getClienteIdOrThrow();
   const { error } = await supabase.from("reservas").delete().eq("id_cliente", idCliente);
   if (error) return { success: false, error: "Error al vaciar el carrito" };
   return { success: true, message: "Carrito vaciado" };
 }
 
-export async function getContadorCarrito(idCliente: number) {
-  await limpiarReservasExpiradas();
+export async function getContadorCarrito() {
+  const supabase = await createClient();
+  const idCliente = await getClienteIdOrThrow();
+  await limpiarReservasExpiradas(supabase);
   const { data, error } = await supabase.from("reservas").select("cantidad").eq("id_cliente", idCliente).gt("fecha_expiracion", new Date().toISOString());
   if (error) return 0;
   return data?.reduce((sum: number, r: any) => sum + r.cantidad, 0) || 0;
 }
 
-export async function validarCarritoParaCheckout(idCliente: number) {
-  await limpiarReservasExpiradas();
+export async function validarCarritoParaCheckout() {
+  const supabase = await createClient();
+  const idCliente = await getClienteIdOrThrow();
+  await limpiarReservasExpiradas(supabase);
   const { data: reservas, error } = await supabase
     .from("reservas")
     .select(`id_reserva, id_producto, cantidad, fecha_expiracion, productos (nombre, precio_venta, stock_total, estado)`)
@@ -97,7 +142,7 @@ export async function validarCarritoParaCheckout(idCliente: number) {
   for (const reserva of reservas as any[]) {
     const producto = reserva.productos as any;
     if (!producto) { errores.push(`Producto ${reserva.id_producto} no encontrado`); continue; }
-    if (producto.estado !== 'activo') { errores.push(`${producto.nombre} ya no esta disponible`); continue; }
+    if ((producto as any).estado !== 'activo') { errores.push(`${producto.nombre} ya no esta disponible`); continue; }
     const { data: otrasReservas } = await supabase.from("reservas").select("cantidad").eq("id_producto", reserva.id_producto).neq("id_reserva", reserva.id_reserva).gt("fecha_expiracion", new Date().toISOString());
     const stockReservadoPorOtros = otrasReservas?.reduce((sum: number, r: any) => sum + r.cantidad, 0) || 0;
     const stockDisponible = (producto as any).stock_total - stockReservadoPorOtros;

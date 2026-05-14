@@ -13,23 +13,27 @@ export default function AgregarAlCarritoBtn({ idProducto, enStock }: Props) {
   const { agregarProducto } = useCarrito()
   const [agregado, setAgregado] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const handleAgregar = async () => {
     if (!enStock || loading) return
 
     setLoading(true)
+    setErrorMsg(null)
     const result = await agregarProducto(idProducto, 1)
     
     if (result.success) {
       setAgregado(true)
       setTimeout(() => setAgregado(false), 2000)
     } else {
-      alert(result.error || 'Error al agregar al carrito')
+      setErrorMsg(result.error || 'Error al agregar al carrito')
+      setTimeout(() => setErrorMsg(null), 4000)
     }
     setLoading(false)
   }
 
   return (
+    <>
     <button
       onClick={handleAgregar}
       disabled={!enStock || loading}
@@ -53,5 +57,9 @@ export default function AgregarAlCarritoBtn({ idProducto, enStock }: Props) {
         </>
       )}
     </button>
+    {errorMsg && (
+      <p className="text-red-600 dark:text-red-400 text-sm text-center mt-2">{errorMsg}</p>
+    )}
+    </>
   )
 }

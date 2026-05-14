@@ -1,11 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import ChevronLeft from 'lucide-react/dist/esm/icons/chevron-left'
-import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right'
-import Leaf from 'lucide-react/dist/esm/icons/leaf'
-import ShoppingCart from 'lucide-react/dist/esm/icons/shopping-cart'
-import Sparkles from 'lucide-react/dist/esm/icons/sparkles'
+import { ChevronLeft, ChevronRight, Leaf, ShoppingCart, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 

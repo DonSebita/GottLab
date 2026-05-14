@@ -90,11 +90,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const role = profile?.role ?? null
+  const perfilClienteId = profile && 'id_cliente' in profile ? profile.id_cliente : null
   return (
     <AuthContext.Provider value={{
       user, session, profile, loading, signIn, signUp, signOut, refresh,
       isAdmin: role === 'admin', isEmpleado: role === 'empleado', isCliente: role === 'cliente',
-      perfilId: profile ? ('id_cliente' in profile ? profile.id_cliente : profile.id_empleado) : null,
+      perfilId: perfilClienteId,
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,7 +1,7 @@
 import { updateSession } from '@/lib/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const protectedPrefixes = ['/admin', '/panel-empleado', '/mi-cuenta']
+const protectedPrefixes = ['/admin', '/mi-cuenta']
 
 export async function proxy(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request)

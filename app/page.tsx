@@ -1,13 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Leaf, Droplets, TrendingUp, BadgeCheck, ArrowRight } from "lucide-react";
 import HeroCarousel from "@/components/HeroCarousel";
-import HeroCarouselV2 from "@/components/HeroCarouselV2";
 import ProductCarousel from "@/components/ProductCarousel";
 import ProductCard from "@/components/ProductCard";
 import { getDestacados, getHeroProductos, getNuevos, getProductos } from "@/lib/actions/productos";
-
-const formatCLP = (n: number) => `$${Number(n).toLocaleString('es-CL')}`
+import { formatCLP } from "@/lib/utils";
 
 const HERO_COUNT = 4;
 const NUEVOS_COUNT = 4;
@@ -45,8 +42,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-white dark:bg-stone-950">
       {/* Hero Carousel */}
-      {/* <HeroCarousel productos={heroItems} /> */}
-      {<HeroCarousel productos={heroItems} />}
+      <HeroCarousel productos={heroItems} />
 
       {/* Features Section */}
       <section className="py-8 md:py-16 bg-white dark:bg-stone-950">
@@ -156,7 +152,7 @@ export default async function Home() {
               Explorar Catálogo
             </Link>
             <Link 
-              href="/productos"
+              href="/preventas"
               className="inline-flex items-center justify-center px-8 py-4 border-2 border-gray-700 text-white font-semibold rounded-2xl hover:border-gray-500 transition-colors"
             >
               Ver Preventas
