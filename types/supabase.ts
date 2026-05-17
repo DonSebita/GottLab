@@ -144,6 +144,56 @@ export type Database = {
           },
         ]
       }
+      grupos_envio: {
+        Row: {
+          codigo:            string | null
+          costo_total_envio: number | null
+          courier:           string | null
+          created_at:        string
+          estado:            string
+          fecha_cierre:      string | null
+          fecha_despacho:    string | null
+          id_cliente:        number | null
+          id_grupo_envio:    number
+          tipo_despacho:     string | null
+          tracking_general:  string | null
+        }
+        Insert: {
+          codigo?:            string | null
+          costo_total_envio?: number | null
+          courier?:           string | null
+          created_at?:        string
+          estado?:            string
+          fecha_cierre?:      string | null
+          fecha_despacho?:    string | null
+          id_cliente?:        number | null
+          id_grupo_envio?:    number
+          tipo_despacho?:     string | null
+          tracking_general?:  string | null
+        }
+        Update: {
+          codigo?:            string | null
+          costo_total_envio?: number | null
+          courier?:           string | null
+          created_at?:        string
+          estado?:            string
+          fecha_cierre?:      string | null
+          fecha_despacho?:    string | null
+          id_cliente?:        number | null
+          id_grupo_envio?:    number
+          tipo_despacho?:     string | null
+          tracking_general?:  string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grupos_envio_id_cliente_fkey"
+            columns: ["id_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id_cliente"]
+          },
+        ]
+      }
       detallepedido: {
         Row: {
           cantidad: number
@@ -185,40 +235,46 @@ export type Database = {
       }
       direcciones: {
         Row: {
-          alias: string | null
-          ciudad: string | null
-          codigo_postal: string | null
-          comuna: string | null
-          direccion: string | null
-          id_cliente: number
+          alias:        string | null
+          ciudad:       string | null
+          codigo_postal:string | null
+          comuna:       string | null
+          direccion:    string | null
+          id_cliente:   number
           id_direccion: number
-          pais: string | null
-          region: string | null
-          tipo: string | null
+          pais:         string | null
+          referencias:  string | null
+          region:       string | null
+          sucursal:     string | null
+          tipo:         string | null
         }
         Insert: {
-          alias?: string | null
-          ciudad?: string | null
-          codigo_postal?: string | null
-          comuna?: string | null
-          direccion?: string | null
-          id_cliente: number
+          alias?:        string | null
+          ciudad?:       string | null
+          codigo_postal?:string | null
+          comuna?:       string | null
+          direccion?:    string | null
+          id_cliente:    number
           id_direccion?: number
-          pais?: string | null
-          region?: string | null
-          tipo?: string | null
+          pais?:         string | null
+          referencias?:  string | null
+          region?:       string | null
+          sucursal?:     string | null
+          tipo?:         string | null
         }
         Update: {
-          alias?: string | null
-          ciudad?: string | null
-          codigo_postal?: string | null
-          comuna?: string | null
-          direccion?: string | null
-          id_cliente?: number
+          alias?:        string | null
+          ciudad?:       string | null
+          codigo_postal?:string | null
+          comuna?:       string | null
+          direccion?:    string | null
+          id_cliente?:   number
           id_direccion?: number
-          pais?: string | null
-          region?: string | null
-          tipo?: string | null
+          pais?:         string | null
+          referencias?:  string | null
+          region?:       string | null
+          sucursal?:     string | null
+          tipo?:         string | null
         }
         Relationships: [
           {
@@ -286,58 +342,57 @@ export type Database = {
       }
       envios: {
         Row: {
-          ciudad: string | null
-          comuna: string | null
-          costo: number | null
-          direccion_texto: string | null
-          estado: string | null
-          fecha: string | null
-          id_direccion: number
-          id_envio: number
-          id_pedido: number
-          region: string | null
-          tracking: string | null
+          codigo_seguimiento: string | null
+          codigo_servicio:    string | null
+          costo:              number | null
+          courier:            string | null
+          dias_estimados:     number | null
+          direccion_snapshot: Json | null
+          distancia_km:       number | null
+          estado:             string | null
+          fecha:              string | null
+          fecha_entrega:      string | null
+          fecha_envio:        string | null
+          id_envio:           number
+          id_grupo_envio:     number | null
         }
         Insert: {
-          ciudad?: string | null
-          comuna?: string | null
-          costo?: number | null
-          direccion_texto?: string | null
-          estado?: string | null
-          fecha?: string | null
-          id_direccion: number
-          id_envio?: number
-          id_pedido: number
-          region?: string | null
-          tracking?: string | null
+          codigo_seguimiento?: string | null
+          codigo_servicio?:    string | null
+          costo?:              number | null
+          courier?:            string | null
+          dias_estimados?:     number | null
+          direccion_snapshot?: Json | null
+          distancia_km?:       number | null
+          estado?:             string | null
+          fecha?:              string | null
+          fecha_entrega?:      string | null
+          fecha_envio?:        string | null
+          id_envio?:           number
+          id_grupo_envio?:     number | null
         }
         Update: {
-          ciudad?: string | null
-          comuna?: string | null
-          costo?: number | null
-          direccion_texto?: string | null
-          estado?: string | null
-          fecha?: string | null
-          id_direccion?: number
-          id_envio?: number
-          id_pedido?: number
-          region?: string | null
-          tracking?: string | null
+          codigo_seguimiento?: string | null
+          codigo_servicio?:    string | null
+          costo?:              number | null
+          courier?:            string | null
+          dias_estimados?:     number | null
+          direccion_snapshot?: Json | null
+          distancia_km?:       number | null
+          estado?:             string | null
+          fecha?:              string | null
+          fecha_entrega?:      string | null
+          fecha_envio?:        string | null
+          id_envio?:           number
+          id_grupo_envio?:     number | null
         }
         Relationships: [
           {
-            foreignKeyName: "envios_id_direccion_fkey"
-            columns: ["id_direccion"]
+            foreignKeyName: "envios_id_grupo_envio_fkey"
+            columns: ["id_grupo_envio"]
             isOneToOne: false
-            referencedRelation: "direcciones"
-            referencedColumns: ["id_direccion"]
-          },
-          {
-            foreignKeyName: "envios_id_pedido_fkey"
-            columns: ["id_pedido"]
-            isOneToOne: false
-            referencedRelation: "pedidos"
-            referencedColumns: ["id_pedido"]
+            referencedRelation: "grupos_envio"
+            referencedColumns: ["id_grupo_envio"]
           },
         ]
       }
@@ -448,25 +503,55 @@ export type Database = {
       }
       pedidos: {
         Row: {
-          estado: string
-          fecha: string | null
-          id_cliente: number
-          id_pedido: number
-          total: number
+          codigo_pedido:      string | null
+          costo_envio:        number | null
+          descuentos:         number | null
+          direccion_snapshot: Json | null
+          estado:             string
+          estado_envio:       string | null
+          estado_pago:        string | null
+          fecha:              string | null
+          id_cliente:         number
+          id_direccion:       number | null
+          id_grupo_envio:     number | null
+          id_pedido:          number
+          observaciones:      string | null
+          subtotal:           number | null
+          total:              number
         }
         Insert: {
-          estado: string
-          fecha?: string | null
-          id_cliente: number
-          id_pedido?: number
-          total: number
+          codigo_pedido?:      string | null
+          costo_envio?:        number | null
+          descuentos?:         number | null
+          direccion_snapshot?: Json | null
+          estado:              string
+          estado_envio?:       string | null
+          estado_pago?:        string | null
+          fecha?:              string | null
+          id_cliente:          number
+          id_direccion?:       number | null
+          id_grupo_envio?:     number | null
+          id_pedido?:          number
+          observaciones?:      string | null
+          subtotal?:           number | null
+          total:               number
         }
         Update: {
-          estado?: string
-          fecha?: string | null
-          id_cliente?: number
-          id_pedido?: number
-          total?: number
+          codigo_pedido?:      string | null
+          costo_envio?:        number | null
+          descuentos?:         number | null
+          direccion_snapshot?: Json | null
+          estado?:             string
+          estado_envio?:       string | null
+          estado_pago?:        string | null
+          fecha?:              string | null
+          id_cliente?:         number
+          id_direccion?:       number | null
+          id_grupo_envio?:     number | null
+          id_pedido?:          number
+          observaciones?:      string | null
+          subtotal?:           number | null
+          total?:              number
         }
         Relationships: [
           {
@@ -483,56 +568,82 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id_cliente"]
           },
+          {
+            foreignKeyName: "pedidos_id_direccion_fkey"
+            columns: ["id_direccion"]
+            isOneToOne: false
+            referencedRelation: "direcciones"
+            referencedColumns: ["id_direccion"]
+          },
+          {
+            foreignKeyName: "pedidos_id_grupo_envio_fkey"
+            columns: ["id_grupo_envio"]
+            isOneToOne: false
+            referencedRelation: "grupos_envio"
+            referencedColumns: ["id_grupo_envio"]
+          },
         ]
       }
       productos: {
         Row: {
-          descripcion: string | null
-          destacado: boolean | null
-          estado: string | null
-          id_categoria: number | null
-          id_producto: number
-          nombre: string
-          nombre_cientifico: string | null
-          nuevo: boolean | null
-          precio_costo: number | null
-          precio_venta: number
-          prioridad: number | null
-          stock_reservado: number | null
-          stock_total: number | null
-          tipo_venta: string | null
+          alto_cm:          number | null
+          ancho_cm:         number | null
+          descripcion:      string | null
+          destacado:        boolean | null
+          estado:           string | null
+          id_categoria:     number | null
+          id_producto:      number
+          largo_cm:         number | null
+          nombre:           string
+          nombre_cientifico:string | null
+          nuevo:            boolean | null
+          peso_kg:          number | null
+          precio_costo:     number | null
+          precio_venta:     number
+          prioridad:        number | null
+          stock_reservado:  number | null
+          stock_total:      number | null
+          tipo_venta:       string | null
         }
         Insert: {
-          descripcion?: string | null
-          destacado?: boolean | null
-          estado?: string | null
-          id_categoria?: number | null
-          id_producto?: number
-          nombre: string
-          nombre_cientifico?: string | null
-          nuevo?: boolean | null
-          precio_costo?: number | null
-          precio_venta: number
-          prioridad?: number | null
-          stock_reservado?: number | null
-          stock_total?: number | null
-          tipo_venta?: string | null
+          alto_cm?:          number | null
+          ancho_cm?:         number | null
+          descripcion?:      string | null
+          destacado?:        boolean | null
+          estado?:           string | null
+          id_categoria?:     number | null
+          id_producto?:      number
+          largo_cm?:         number | null
+          nombre:            string
+          nombre_cientifico?:string | null
+          nuevo?:            boolean | null
+          peso_kg?:          number | null
+          precio_costo?:     number | null
+          precio_venta:      number
+          prioridad?:        number | null
+          stock_reservado?:  number | null
+          stock_total?:      number | null
+          tipo_venta?:       string | null
         }
         Update: {
-          descripcion?: string | null
-          destacado?: boolean | null
-          estado?: string | null
-          id_categoria?: number | null
-          id_producto?: number
-          nombre?: string
-          nombre_cientifico?: string | null
-          nuevo?: boolean | null
-          precio_costo?: number | null
-          precio_venta?: number
-          prioridad?: number | null
-          stock_reservado?: number | null
-          stock_total?: number | null
-          tipo_venta?: string | null
+          alto_cm?:          number | null
+          ancho_cm?:         number | null
+          descripcion?:      string | null
+          destacado?:        boolean | null
+          estado?:           string | null
+          id_categoria?:     number | null
+          id_producto?:      number
+          largo_cm?:         number | null
+          nombre?:           string
+          nombre_cientifico?:string | null
+          nuevo?:            boolean | null
+          peso_kg?:          number | null
+          precio_costo?:     number | null
+          precio_venta?:     number
+          prioridad?:        number | null
+          stock_reservado?:  number | null
+          stock_total?:      number | null
+          tipo_venta?:       string | null
         }
         Relationships: [
           {
@@ -576,6 +687,8 @@ export type Database = {
           id_cliente: number
           id_producto: number
           id_reserva: number
+          origen: string | null
+          precio_especial: number | null
         }
         Insert: {
           cantidad: number
@@ -584,6 +697,8 @@ export type Database = {
           id_cliente: number
           id_producto: number
           id_reserva?: number
+          origen?: string | null
+          precio_especial?: number | null
         }
         Update: {
           cantidad?: number
@@ -592,6 +707,8 @@ export type Database = {
           id_cliente?: number
           id_producto?: number
           id_reserva?: number
+          origen?: string | null
+          precio_especial?: number | null
         }
         Relationships: [
           {
